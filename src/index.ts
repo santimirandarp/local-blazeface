@@ -7,7 +7,7 @@ import IJS from 'image-js';
 import { BlazeFaceModel as BlazeFace } from './blazeface/face';
 
 async function run() {
-  let rawImage = await IJS.load(join(__dirname, '../test4.jpg'));
+  let rawImage = await IJS.load(join(__dirname, '../TEST_IMAGE.jpg'));
 
   // needs exactly that size (which alters the image asp ratio)
   rawImage = rawImage.resize({ width: 128, height: 128 });
@@ -18,7 +18,7 @@ async function run() {
     await pretrainedNN,
     rawImage.width,
     rawImage.height,
-    5,
+    6,
     0.3,
     0.3,
   );

@@ -15,10 +15,9 @@
  * =============================================================================
  */
 
-import * as tfconv from "@tensorflow/tfjs-converter";
-import * as tf from "@tensorflow/tfjs-core";
+import * as tf from '@tensorflow/tfjs';
 
-import { Box, createBox, disposeBox, scaleBox } from "./box";
+import { Box, createBox, disposeBox, scaleBox } from './box';
 
 /*
  * The object describing a face.
@@ -55,7 +54,7 @@ const NUM_LANDMARKS = 6;
 function generateAnchors(
   width: number,
   height: number,
-  outputSpec: AnchorsConfig
+  outputSpec: AnchorsConfig,
 ): number[][] {
   const anchors = [];
   for (let i = 0; i < outputSpec.strides.length; i++) {
@@ -82,7 +81,7 @@ function generateAnchors(
 function decodeBounds(
   boxOutputs: tf.Tensor2D,
   anchors: tf.Tensor2D,
-  inputSize: tf.Tensor1D
+  inputSize: tf.Tensor1D,
 ): tf.Tensor2D {
   const boxStarts = tf.slice(boxOutputs, [0, 1], [-1, 2]);
   const centers = tf.add(boxStarts, anchors);
@@ -101,7 +100,7 @@ function decodeBounds(
   const concatAxis = 1;
   return tf.concat2d(
     [startNormalized as tf.Tensor2D, endNormalized as tf.Tensor2D],
-    concatAxis
+    concatAxis,
   );
 }
 
@@ -111,7 +110,7 @@ function getInputTensorDimensions(
     | ImageData
     | HTMLVideoElement
     | HTMLImageElement
-    | HTMLCanvasElement
+    | HTMLCanvasElement,
 ): [number, number] {
   return input instanceof tf.Tensor
     ? [input.shape[0], input.shape[1]]
@@ -120,7 +119,7 @@ function getInputTensorDimensions(
 
 function flipFaceHorizontal(
   face: NormalizedFace,
-  imageWidth: number
+  imageWidth: number,
 ): NormalizedFace {
   let flippedTopLeft: [number, number] | tf.Tensor1D;
   let flippedBottomRight: [number, number] | tf.Tensor1D;
@@ -150,7 +149,7 @@ function flipFaceHorizontal(
       flippedLandmarks = tf.tidy(() => {
         const a: tf.Tensor2D = tf.sub(
           tf.tensor1d([imageWidth - 1, 0]),
-          face.landmarks as tf.TensorLike
+          face.landmarks as tf.TensorLike,
         );
         const b = tf.tensor1d([1, -1]);
         const product: tf.Tensor2D = tf.mul(a, b);
@@ -161,7 +160,7 @@ function flipFaceHorizontal(
     const [topLeftX, topLeftY] = face.topLeft as unknown as [number, number];
     const [bottomRightX, bottomRightY] = face.bottomRight as unknown as [
       number,
-      number
+      number,
     ];
 
     flippedTopLeft = [imageWidth - 1 - topLeftX, topLeftY];
@@ -169,7 +168,7 @@ function flipFaceHorizontal(
 
     if (face.landmarks != null) {
       flippedLandmarks = (face.landmarks as number[][]).map(
-        (coord: number[]) => [imageWidth - 1 - coord[0], coord[1]]
+        (coord: number[]) => [imageWidth - 1 - coord[0], coord[1]],
       );
     }
   }
@@ -195,11 +194,12 @@ function flipFaceHorizontal(
 
 function scaleBoxFromPrediction(
   face: BlazeFacePrediction | Box,
-  scaleFactor: tf.Tensor1D | [number, number]
+  scaleFactor: tf.Tensor1D | [number, number],
 ) {
   return tf.tidy(() => {
     let box;
-    if (face.hasOwnProperty("box")) {
+    // eslint-disable-next-line no-prototype-builtins
+    if (face.hasOwnProperty('box')) {
       box = (face as BlazeFacePrediction).box;
     } else {
       box = face;
@@ -209,7 +209,7 @@ function scaleBoxFromPrediction(
 }
 
 export class BlazeFaceModel {
-  private blazeFaceModel: tfconv.GraphModel;
+  private blazeFaceModel: tf.GraphModel;
   private width: number;
   private height: number;
   private maxFaces: number;
@@ -221,12 +221,12 @@ export class BlazeFaceModel {
   private scoreThreshold: number;
 
   constructor(
-    model: tfconv.GraphModel,
+    model: tf.GraphModel,
     width: number,
     height: number,
     maxFaces: number,
     iouThreshold: number,
-    scoreThreshold: number
+    scoreThreshold: number,
   ) {
     this.blazeFaceModel = model;
     this.width = width;
@@ -235,7 +235,10 @@ export class BlazeFaceModel {
     this.anchorsData = generateAnchors(
       width,
       height,
-      ANCHORS_CONFIG as { strides: [number, number]; anchors: [number, number] }
+      ANCHORS_CONFIG as {
+        strides: [number, number];
+        anchors: [number, number];
+      },
     );
     this.anchors = tf.tensor2d(this.anchorsData);
     this.inputSizeData = [width, height];
@@ -248,7 +251,7 @@ export class BlazeFaceModel {
   async getBoundingBoxes(
     inputImage: tf.Tensor4D,
     returnTensors: boolean,
-    annotateBoxes = true
+    annotateBoxes = true,
   ): Promise<{
     boxes: Array<BlazeFacePrediction | Box>;
     scaleFactor: tf.Tensor | [number, number];
@@ -261,7 +264,7 @@ export class BlazeFaceModel {
         ]);
         const normalizedImage = tf.mul(
           tf.sub(tf.div(resizedImage, 255), 0.5),
-          2
+          2,
         );
 
         // [1, 897, 17] 1 = batch, 897 = number of anchors
@@ -271,7 +274,7 @@ export class BlazeFaceModel {
         const decodedBounds = decodeBounds(
           prediction as tf.Tensor2D,
           this.anchors,
-          this.inputSize
+          this.inputSize,
         );
         const logits = tf.slice(prediction as tf.Tensor2D, [0, 0], [-1, 1]);
         const scores = tf.squeeze(tf.sigmoid(logits));
@@ -280,7 +283,7 @@ export class BlazeFaceModel {
           decodedBounds,
           scores as tf.Tensor1D,
         ];
-      }
+      },
     );
 
     // TODO: Once tf.image.nonMaxSuppression includes a flag to suppress console
@@ -292,7 +295,7 @@ export class BlazeFaceModel {
       scores,
       this.maxFaces,
       this.iouThreshold,
-      this.scoreThreshold
+      this.scoreThreshold,
     );
     console.warn = savedConsoleWarnFn;
 
@@ -300,7 +303,7 @@ export class BlazeFaceModel {
     boxIndicesTensor.dispose();
 
     let boundingBoxes: tf.Tensor[] | number[][][] = boxIndices.map(
-      (boxIndex: number) => tf.slice(boxes, [boxIndex, 0], [1, -1])
+      (boxIndex: number) => tf.slice(boxes, [boxIndex, 0], [1, -1]),
     );
     if (!returnTensors) {
       boundingBoxes = await Promise.all(
@@ -309,7 +312,7 @@ export class BlazeFaceModel {
           const vals = await boundingBox.array();
           boundingBox.dispose();
           return vals;
-        })
+        }),
       );
     }
 
@@ -328,11 +331,12 @@ export class BlazeFaceModel {
 
     const annotatedBoxes = [];
     for (let i = 0; i < boundingBoxes.length; i++) {
-      const boundingBox = boundingBoxes[i] as tf.Tensor2D | number[][];
+      const boundingBox = boundingBoxes[i];
       const annotatedBox = tf.tidy(() => {
         const box =
           boundingBox instanceof tf.Tensor
-            ? createBox(boundingBox)
+            ? //@ts-expect-error idk
+              createBox(boundingBox)
             : createBox(tf.tensor2d(boundingBox));
 
         if (!annotateBoxes) {
@@ -350,9 +354,9 @@ export class BlazeFaceModel {
 
         const landmarks = tf.reshape(
           tf.squeeze(
-            tf.slice(detectedOutputs, [boxIndex, NUM_LANDMARKS - 1], [1, -1])
+            tf.slice(detectedOutputs, [boxIndex, NUM_LANDMARKS - 1], [1, -1]),
           ),
-          [NUM_LANDMARKS, -1]
+          [NUM_LANDMARKS, -1],
         );
         const probability = tf.slice(scores, [boxIndex], [1]);
 
@@ -400,19 +404,19 @@ export class BlazeFaceModel {
       | HTMLCanvasElement,
     returnTensors = false,
     flipHorizontal = false,
-    annotateBoxes = true
+    annotateBoxes = true,
   ): Promise<NormalizedFace[]> {
     const [, width] = getInputTensorDimensions(input);
     const image = tf.tidy(() => {
       if (!(input instanceof tf.Tensor)) {
         input = tf.browser.fromPixels(input);
       }
-      return tf.expandDims(tf.cast(input as tf.Tensor, "float32"), 0);
+      return tf.expandDims(tf.cast(input as tf.Tensor, 'float32'), 0);
     });
     const { boxes, scaleFactor } = await this.getBoundingBoxes(
       image as tf.Tensor4D,
       returnTensors,
-      annotateBoxes
+      annotateBoxes,
     );
     image.dispose();
 
@@ -420,7 +424,7 @@ export class BlazeFaceModel {
       return boxes.map((face: BlazeFacePrediction | Box) => {
         const scaledBox = scaleBoxFromPrediction(
           face,
-          scaleFactor as tf.Tensor1D
+          scaleFactor as tf.Tensor1D,
         );
         let normalizedFace: NormalizedFace = {
           topLeft: tf.slice(scaledBox, [0], [2]) as tf.Tensor1D,
@@ -436,7 +440,7 @@ export class BlazeFaceModel {
 
           const normalizedLandmarks: tf.Tensor2D = tf.mul(
             tf.add(landmarks, anchor),
-            scaleFactor
+            scaleFactor,
           );
           normalizedFace.landmarks = normalizedLandmarks;
           normalizedFace.probability = probability;
@@ -454,7 +458,7 @@ export class BlazeFaceModel {
       boxes.map(async (face: BlazeFacePrediction) => {
         const scaledBox = scaleBoxFromPrediction(
           face,
-          scaleFactor as [number, number]
+          scaleFactor as [number, number],
         );
         let normalizedFace: NormalizedFace;
         if (!annotateBoxes) {
@@ -466,8 +470,8 @@ export class BlazeFaceModel {
         } else {
           const [landmarkData, boxData, probabilityData] = await Promise.all(
             [face.landmarks, scaledBox, face.probability].map(async (d) =>
-              d.array()
-            )
+              d.array(),
+            ),
           );
 
           const anchor = face.anchor as [number, number];
@@ -476,7 +480,7 @@ export class BlazeFaceModel {
             (landmark) => [
               (landmark[0] + anchor[0]) * scaleFactorX,
               (landmark[1] + anchor[1]) * scaleFactorY,
-            ]
+            ],
           );
 
           normalizedFace = {
@@ -498,7 +502,7 @@ export class BlazeFaceModel {
         }
 
         return normalizedFace;
-      })
+      }),
     );
   }
 
